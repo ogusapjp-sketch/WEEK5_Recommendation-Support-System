@@ -14,6 +14,12 @@ except ImportError:
     st.error("⚠️ `search_engine.py` が見つからないケロ！確認してほしいケロ。")
     st.stop()
 
+try:
+    from llm_advisor import get_kero_advice, summarize_project
+except ImportError:
+    get_kero_advice = None
+    summarize_project = None
+
 # 画像の読み込み
 image_path = "yomi-gaeru.png"
 try:
@@ -135,7 +141,17 @@ with st.form("search_form"):
         st.write("") 
         submit_btn = st.form_submit_button("💡 ケロさんにアーカイブを探してもらう", use_container_width=True)
 
-# ── 検索実行と結果表示 ─────────────────────────────────────────
+# ── session_state 初期化 ───────────────────────────────────────
+if "last_results" not in st.session_state:
+    st.session_state["last_results"] = None
+
+if "last_input_dict" not in st.session_state:
+    st.session_state["last_input_dict"] = None
+
+if "project_summaries" not in st.session_state:
+    st.session_state["project_summaries"] = {}
+
+# ── 検索実行 ───────────────────────────────────────────────────
 if submit_btn:
     input_dict = {
         "proposal_category": category if category != "（指定なし）" else "",
@@ -144,41 +160,114 @@ if submit_btn:
         "expected_effect_type": effect if effect != "（指定なし）" else "",
         "project_phase": phase if phase != "（指定なし）" else ""
     }
-    
+
     if not any(val for val in input_dict.values() if val != ""):
         st.warning("🐸 検索条件をどれか1つでも選んでほしいケロ！")
+        st.session_state["last_results"] = None
+        st.session_state["last_input_dict"] = None
+        st.session_state["project_summaries"] = {}
     else:
         with st.spinner("照合中ケロ..."):
             try:
                 df_results = search_projects(input_dict, top_n=20)
-                if df_results is not None and not df_results.empty:
-                    st.success(f"✅ {len(df_results)} 件見つかったケロ！")
-                    t1, t2 = st.tabs(["📄 詳細レポート", "📊 ローデータ"])
-                    with t1:
-                        for idx, row in df_results.iterrows():
-                            title = row.get("project_name", f"アーカイブ #{idx}")
-                            score = row.get("similarity_score", 0.0)
-                            with st.expander(f"🐸 {title} (類似度: {score}%)"):
-                                c1, c2 = st.columns(2)
-                                with c1:
-                                    st.write(f"**カテゴリ:** {row.get('proposal_category', '-')}")
-                                    st.write(f"**予算:** {row.get('budget_range', '-')}")
-                                with c2:
-                                    st.info(f"**担当:** {row.get('related_members', '-')}")
-                                st.divider()
-                                success_text = row.get("success_factors", "")
-                                failure_text = row.get("failure_factors", "")
 
-                                if pd.isna(success_text) or str(success_text).strip() == "":
-                                    success_text = "記録なし"
-                                if pd.isna(failure_text) or str(failure_text).strip() == "":
-                                    failure_text = "記録なし"
+                # 検索条件と結果を session_state に保存する
+                st.session_state["last_input_dict"] = input_dict
+                st.session_state["last_results"] = df_results
 
-                                st.write(f"✅ **成功要因:** {success_text}")
-                                st.write(f"⚠️ **失敗要因:** {failure_text}")
-                    with t2:
-                        st.dataframe(df_results)
-                else:
-                    st.info("🐸 該当なしだケロ。条件を減らして再検索してみてケロ！")
+                # 新しい検索をしたら、案件サマリーは一度リセットする
+                st.session_state["project_summaries"] = {}
+
             except Exception as e:
                 st.error(f"エラーが発生したケロ: {e}")
+                st.session_state["last_results"] = None
+                st.session_state["last_input_dict"] = None
+
+
+# ── 検索結果表示 ───────────────────────────────────────────────
+df_results = st.session_state.get("last_results")
+input_dict = st.session_state.get("last_input_dict")
+
+if df_results is not None:
+    if not df_results.empty:
+        st.success(f"✅ {len(df_results)} 件見つかったケロ！")
+        t1, t2, t3 = st.tabs(["📄 詳細レポート", "📊 ローデータ", "🐸 ケロさんアドバイス"])
+
+        with t1:
+            for idx, row in df_results.iterrows():
+                title = row.get("project_name", f"アーカイブ #{idx}")
+                score = row.get("similarity_score", 0.0)
+                project_id = row.get("project_id", idx)
+
+                with st.expander(f"🐸 {title} (類似度: {score}%)"):
+                    c1, c2 = st.columns(2)
+
+                    with c1:
+                        st.write(f"**カテゴリ:** {row.get('proposal_category', '-')}")
+                        st.write(f"**予算:** {row.get('budget_range', '-')}")
+
+                        st.write("**案件サマリー:**")
+                        if summarize_project is None:
+                            st.write("要約機能は未設定だケロ。")
+                        else:
+                            if st.button("この案件を要約するケロ", key=f"summary_{project_id}"):
+                                with st.spinner("案件を要約中だケロ..."):
+                                    summary_text = summarize_project(row.to_dict())
+                                st.session_state["project_summaries"][project_id] = summary_text
+
+                            # すでに要約済みなら表示する
+                            if project_id in st.session_state["project_summaries"]:
+                                st.write(st.session_state["project_summaries"][project_id])
+
+                    with c2:
+                        st.info(f"**担当:** {row.get('related_members', '-')}")
+
+                    st.divider()
+
+                    success_text = row.get("success_factors", "")
+                    failure_text = row.get("failure_factors", "")
+
+                    if pd.isna(success_text) or str(success_text).strip() == "":
+                        success_text = "記録なし"
+                    if pd.isna(failure_text) or str(failure_text).strip() == "":
+                        failure_text = "記録なし"
+
+                    st.write(f"✅ **成功要因:** {success_text}")
+                    st.write(f"⚠️ **失敗要因:** {failure_text}")
+
+        with t2:
+            st.dataframe(df_results)
+
+        with t3:
+            st.subheader("🐸 ケロさんからのおすすめアドバイス")
+
+            if get_kero_advice is None:
+                st.info("LLMアドバイス機能が未設定です。`llm_advisor.py` を配置してください。")
+            else:
+                with st.spinner("ケロさんが過去案件を分析中ケロ..."):
+                    try:
+                        advice = get_kero_advice(input_dict, df_results, top_n=20)
+
+                        st.markdown("### ケロさん評価")
+                        st.info(advice.get("tone_comment", "コメントなし"))
+
+                        st.markdown("### 稟議に通る確率・成功確率を上げるための戦略")
+                        for item in advice.get("strategy", []):
+                            st.write(f"- {item}")
+
+                        st.markdown("### アドバイスを求めるべき部署と担当者")
+                        ask_people = advice.get("ask_people", [])[:3]
+                        if ask_people:
+                            for p in ask_people:
+                                department = p.get("department", "")
+                                person_or_role = p.get("person_or_role", "")
+                                reason = p.get("reason", "")
+                                st.write(f"- **{department} / {person_or_role}**：{reason}")
+                        else:
+                            st.write("- 特に推奨候補なし")
+
+                    except Exception as e:
+                        st.error(f"ケロさんアドバイス生成中にエラーが発生したケロ: {e}")
+
+    else:
+        st.info("🐸 該当なしだケロ。条件を減らして再検索してみてケロ！")

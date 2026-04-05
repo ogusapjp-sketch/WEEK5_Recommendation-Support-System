@@ -17,6 +17,10 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from data_loader import load_data
 
+try:
+    from llm_advisor import get_kero_advice
+except ImportError:
+    get_kero_advice = None
 
 SEARCH_FIELDS = [
     "proposal_category",
