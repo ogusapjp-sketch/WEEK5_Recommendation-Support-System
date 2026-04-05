@@ -13,9 +13,13 @@ from openai import OpenAI
 from dotenv import load_dotenv
 load_dotenv()
 
-# # OpenAIクライアントを初期化する
+# OpenAIクライアントを初期化する
 # APIキーは環境変数 OPENAI_API_KEY から読む想定
 client = OpenAI()
+
+# モデルの切り替え　→　5-nanoでは上手くいかず、4o-miniで
+LLM_MODEL = "gpt-4o-mini"
+# LLM_MODEL = "gpt-5-nano"
 
 
 def _safe_text(value: Any) -> str:
@@ -28,6 +32,24 @@ def _safe_text(value: Any) -> str:
     except Exception:
         pass
     return str(value).strip()
+
+
+def _clean_json_text(text: str) -> str:
+    # ```json ... ``` のようなコードブロックが付いていても読めるようにする
+    if not text:
+        return ""
+
+    text = text.strip()
+
+    if text.startswith("```json"):
+        text = text[7:]
+    elif text.startswith("```"):
+        text = text[3:]
+
+    if text.endswith("```"):
+        text = text[:-3]
+
+    return text.strip()
 
 
 def _build_case_payload(df_results: pd.DataFrame, top_n: int = 20) -> List[Dict[str, Any]]:
@@ -76,7 +98,13 @@ def _build_prompt(input_dict: Dict[str, Any], cases: List[Dict[str, Any]]) -> st
 
 【分析ルール】
 - 類似度が高い案件をより重視してください。
-- 「稟議に通る確率、事業の成功確率を上げるための戦略」を、実務で使える形で3〜5点に整理してください。
+- 「ケロさん評価」では、検索結果に基づいて総合評価を3〜4文でまとめてください。
+- 「ケロさん評価」には、①この案件の勝ち筋の有無、②まずどこから着手すべきか、③稟議を通すために補強すべき点、④前向きに進めるべきか慎重にすべきか、を自然な文章の流れで含めてください。
+- 「ケロさん評価」は、短すぎる一言で終わらせず、作成者が次に何をすべきかが分かるレベルの具体性を持たせてください。
+- 「稟議に通る確率、事業の成功確率を上げるための戦略」は5点に整理してください。
+- 戦略の各項目は、1項目につき2〜3文で書いてください。
+- 戦略の各項目は、1文目で提案内容、2文目でその理由、必要なら3文目で実務上の進め方や注意点を書くようにしてください。
+- 戦略は抽象論だけでなく、類似案件の成功・失敗パターンを踏まえた示唆にしてください。
 - 「アドバイスを求めるべき部署と担当者」を具体的に整理してください。
 - 類似案件に成功が多く、失敗要因が軽い場合は、前向きに励ましてください。
 - 類似案件に失敗が多く、稟議却下や実施中止が多い場合は、やんわり撤退や縮小検証を勧めてください。
@@ -85,6 +113,7 @@ def _build_prompt(input_dict: Dict[str, Any], cases: List[Dict[str, Any]]) -> st
 - 出力される文章の語尾は、基本的に「〜ケロ。」でそろえてください。
 - 例えば「十分勝ち筋はありそうだケロ。」「まずはPoCで小さく試すのがよさそうだケロ。」のような口調にしてください。
 - 出力はJSONのみで返してください。
+- JSON本体のみを返してください。```json のコードブロックや前置き説明は不要です。
 
 【出力JSON形式】
 {{
@@ -92,7 +121,9 @@ def _build_prompt(input_dict: Dict[str, Any], cases: List[Dict[str, Any]]) -> st
   "strategy": [
     "戦略1",
     "戦略2",
-    "戦略3"
+    "戦略3",
+    "戦略4",
+    "戦略5"
   ],
   "ask_people": [
     {{
@@ -101,23 +132,16 @@ def _build_prompt(input_dict: Dict[str, Any], cases: List[Dict[str, Any]]) -> st
       "reason": "相談すべき理由"
     }}
   ],
-  "tone_comment": "励まし、やんわり撤退提案、または判断保留コメント"
+  "tone_comment": "3〜4文の総合評価コメント"
 }}
 """
     return prompt.strip()
 
+
 def _build_project_summary_prompt(project: Dict[str, Any]) -> str:
     """
     1案件分の情報をもとに、GPTへ渡す要約用プロンプトを作る。
-
-    Args:
-        project: 1案件分の辞書
-
-    Returns:
-        GPTに渡す文字列プロンプト
     """
-    # ここでは「何をした案件か」「結果はどうだったか」「何が学びか」を
-    # 2〜4文くらいで短くまとめてもらう指示を出す
     prompt = f"""
 あなたは社内案件検索アプリ「ヨミガエル」のアシスタントAI「ケロさん」です。
 以下の案件情報をもとに、この案件の要点を日本語で2〜4文程度に簡潔に要約してください。
@@ -138,45 +162,26 @@ def _build_project_summary_prompt(project: Dict[str, Any]) -> str:
 
 
 @st.cache_data(show_spinner=False, ttl=3600)
-def _summarize_project_cached(project_json: str) -> str:
+def _summarize_project_cached(project_json: str, model_name: str) -> str:
     """
-    同じ案件の要約結果を1時間キャッシュする。
-
-    Args:
-        project_json: 案件辞書をJSON文字列化したもの
-
-    Returns:
-        要約文
+    同じ案件・同じモデルの要約結果を1時間キャッシュする。
     """
-    # JSON文字列を辞書に戻す
     project = json.loads(project_json)
-
-    # GPTへ渡すプロンプトを作る
     prompt = _build_project_summary_prompt(project)
 
-    # OpenAI APIで要約を生成する
     response = client.responses.create(
-        model="gpt-5.4",
+        model=model_name,
         input=prompt,
         max_output_tokens=300,
     )
 
-    # 返ってきた文章をそのまま返す
     return response.output_text.strip()
 
 
 def summarize_project(project_row: dict) -> str:
     """
     app.py から呼び出すための1案件要約関数。
-
-    Args:
-        project_row: DataFrameの1行を dict にしたもの
-
-    Returns:
-        案件の短い要約文
     """
-    # GPTに渡す情報を絞る
-    # 情報量を減らすことで、処理時間とコストを抑える
     project = {
         "project_name": _safe_text(project_row.get("project_name")),
         "proposal_department": _safe_text(project_row.get("proposal_department")),
@@ -191,41 +196,41 @@ def summarize_project(project_row: dict) -> str:
         "failure_factors": _safe_text(project_row.get("failure_factors")),
     }
 
-    # cache_data に渡しやすいようにJSON文字列へ変換する
     project_json = json.dumps(project, ensure_ascii=False, sort_keys=True)
+    return _summarize_project_cached(project_json, LLM_MODEL)
 
-    # キャッシュ付き関数を呼ぶ
-    return _summarize_project_cached(project_json)
 
 # 検索時間を短くするためにキャッシュを追加（1時間）
 @st.cache_data(show_spinner=False, ttl=3600)
-def _get_kero_advice_cached(input_dict_json: str, cases_json: str):
+def _get_kero_advice_cached(input_dict_json: str, cases_json: str, model_name: str):
     input_dict = json.loads(input_dict_json)
     cases = json.loads(cases_json)
 
     prompt = _build_prompt(input_dict, cases)
 
     response = client.responses.create(
-        model="gpt-5.4",
+        model=model_name,
         instructions="あなたは慎重で実務的な社内アドバイザーです。出力は必ずJSONのみで返してください。",
         input=prompt,
-        max_output_tokens=1000,
+        max_output_tokens=2000,
     )
 
     text = response.output_text.strip()
+    cleaned_text = _clean_json_text(text)
 
     try:
-        advice = json.loads(text)
+        advice = json.loads(cleaned_text)
     except json.JSONDecodeError:
         advice = {
             "title": "ケロさんからのおすすめアドバイス",
-            "tone_comment": "AI出力の解析に失敗したケロ。もう一度試してほしいケロ。",
+            "tone_comment": "JSONとして読めない返答だったケロ。まずは返答文を確認してほしいケロ。",
             "strategy": ["AI出力の解析に失敗したケロ。"],
             "ask_people": []
         }
 
     advice["ask_people"] = advice.get("ask_people", [])[:3]
     return advice
+
 
 def get_kero_advice(input_dict: Dict[str, Any], df_results: pd.DataFrame, top_n: int = 20) -> Dict[str, Any]:
     # 検索結果をGPTに渡し、ケロさんアドバイスをJSONで受け取る
@@ -238,26 +243,8 @@ def get_kero_advice(input_dict: Dict[str, Any], df_results: pd.DataFrame, top_n:
         }
 
     cases = _build_case_payload(df_results, top_n=top_n)
-    prompt = _build_prompt(input_dict, cases)
 
-    response = client.responses.create(
-        model="gpt-5.4",
-        instructions="あなたは慎重で実務的な社内アドバイザーです。出力は必ずJSONのみで返してください。",
-        input=prompt,
-        max_output_tokens=1200,
-    )
+    input_dict_json = json.dumps(input_dict, ensure_ascii=False, sort_keys=True)
+    cases_json = json.dumps(cases, ensure_ascii=False, sort_keys=True)
 
-    text = response.output_text.strip()
-
-    # モデル出力をJSONとして解釈する
-    try:
-        advice = json.loads(text)
-    except json.JSONDecodeError:
-        advice = {
-            "title": "ケロさんからのおすすめアドバイス",
-            "strategy": ["AI出力の解析に失敗しました。もう一度お試しください。"],
-            "ask_people": [],
-            "tone_comment": text
-        }
-
-    return advice
+    return _get_kero_advice_cached(input_dict_json, cases_json, LLM_MODEL)
