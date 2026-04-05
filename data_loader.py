@@ -69,6 +69,12 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         projects_df = pd.read_sql("SELECT * FROM projects       ORDER BY project_id", conn)
         members_df  = pd.read_sql("SELECT * FROM project_members ORDER BY project_id", conn)
         factors_df  = pd.read_sql("SELECT * FROM project_factors ORDER BY project_id", conn)
+        
+        if "budget_range" in projects_df.columns:
+            projects_df["budget_range"] = pd.to_numeric(
+                projects_df["budget_range"], errors="coerce"
+            )
+
     finally:
         conn.close()
 
@@ -131,8 +137,17 @@ def load_merged() -> pd.DataFrame:
         .merge(failure_df,      on="project_id", how="left")
     )
 
-    # 欠損値を空文字で埋める
-    merged_df = merged_df.fillna("")
+    # 文字列だけ欠損値を空文字で埋める
+    text_cols = ["members_text", "success_factors", "failure_factors"]
+    for col in text_cols:
+        if col in merged_df.columns:
+            merged_df[col] = merged_df[col].fillna("")
+    
+    #"budget_range"を数値型で維持する
+    if "budget_range" in merged_df.columns:
+        merged_df["budget_range"] = pd.to_numeric(
+            merged_df["budget_range"], errors="coerce"
+        )
 
     return merged_df
 

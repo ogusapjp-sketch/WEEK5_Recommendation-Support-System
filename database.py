@@ -55,7 +55,7 @@ def _insert_factors(cur: sqlite3.Cursor, project_id: int, factors: list):
     """要因リストを project_factors へ挿入する（空行・不正タイプはスキップ）。"""
     for f in factors:
         text  = (f.get("factor_text") or "").strip()
-        ftype = f.get("factor_type", "success")
+        ftype = (f.get("factor_type") or "success").strip().lower()
         if text and ftype in ("success", "failure"):
             cur.execute("""
                 INSERT INTO project_factors (project_id, factor_type, factor_text)
