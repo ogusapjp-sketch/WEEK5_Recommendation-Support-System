@@ -166,8 +166,16 @@ if submit_btn:
                                 with c2:
                                     st.info(f"**担当:** {row.get('related_members', '-')}")
                                 st.divider()
-                                st.write(f"✅ **成功要因:** {row.get('success_factors', '記録なし')}")
-                                st.write(f"⚠️ **失敗要因:** {row.get('failure_factors', '記録なし')}")
+                                success_text = row.get("success_factors", "")
+                                failure_text = row.get("failure_factors", "")
+
+                                if pd.isna(success_text) or str(success_text).strip() == "":
+                                    success_text = "記録なし"
+                                if pd.isna(failure_text) or str(failure_text).strip() == "":
+                                    failure_text = "記録なし"
+
+                                st.write(f"✅ **成功要因:** {success_text}")
+                                st.write(f"⚠️ **失敗要因:** {failure_text}")
                     with t2:
                         st.dataframe(df_results)
                 else:
