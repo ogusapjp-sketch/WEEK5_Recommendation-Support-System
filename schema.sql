@@ -5,16 +5,16 @@ CREATE TABLE IF NOT EXISTS projects (
     project_name          TEXT NOT NULL,
     proposal_category     TEXT,
     target_group          TEXT,
-    budget_range          TEXT,
+    budget_range          INTEGER,
     expected_effect_type  TEXT,
     project_phase         TEXT,
     proposal_period       TEXT,
-    proposal_year         INTEGER,
-    proposal_department   TEXT,
+    proposal_year         INTEGER NOT NULL
+    proposal_department   TEXT NOT NULL,
     project_summary       TEXT,
-    ringi_status          TEXT,
+    ringi_status          TEXT NOT NULL,
     ringi_reason          TEXT,
-    implemented_flag      TEXT,
+    implemented_flag      TEXT NOT NULL
     final_result          TEXT
 );
 
