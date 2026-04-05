@@ -165,12 +165,15 @@ def parse_project_html(html: str, filename: str = "") -> dict:
         project_name = td("project-name")
 
     # ── 基本情報 ────────────────────────────────────────────────────────
+    budget_range_raw = td("budget-range")
+    budget_range = int(budget_range_raw) if budget_range_raw.isdigit() else None
+    
     project: dict = {
         "project_id"          : project_id,
         "project_name"        : project_name,
         "proposal_category"   : td("proposal-category"),
         "target_group"        : td("target-group"),
-        "budget_range"        : td("budget-range"),
+        "budget_range"        : budget_range,
         "expected_effect_type": td("expected-effect-type"),
         "project_phase"       : td("project-phase"),
         "proposal_period"     : td("proposal-period"),
