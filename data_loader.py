@@ -30,6 +30,7 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
             - project_id            : 案件ID（主キー）
             - project_name          : 案件名
             - proposal_category     : 提案カテゴリ
+            - business_category     : 事業カテゴリ
             - target_group          : 対象部門
             - budget_range          : 予算レンジ
             - expected_effect_type  : 想定効果の種類
