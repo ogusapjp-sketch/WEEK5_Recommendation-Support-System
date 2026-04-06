@@ -172,6 +172,7 @@ def parse_project_html(html: str, filename: str = "") -> dict:
         "project_id"          : project_id,
         "project_name"        : project_name,
         "proposal_category"   : td("proposal-category"),
+        "business_category"   : td("business-category"),
         "target_group"        : td("target-group"),
         "budget_range"        : budget_range,
         "expected_effect_type": td("expected-effect-type"),

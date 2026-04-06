@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS projects (
     project_id            INTEGER PRIMARY KEY,
     project_name          TEXT NOT NULL,
     proposal_category     TEXT,
+    business_category     TEXT,
     target_group          TEXT,
     budget_range          INTEGER,
     expected_effect_type  TEXT,
@@ -66,6 +67,7 @@ CREATE INDEX IF NOT EXISTS idx_project_members_project_id ON project_members(pro
 CREATE INDEX IF NOT EXISTS idx_project_factors_project_id ON project_factors(project_id);
 CREATE INDEX IF NOT EXISTS idx_projects_proposal_year    ON projects(proposal_year);
 CREATE INDEX IF NOT EXISTS idx_projects_ringi_status     ON projects(ringi_status);
+CREATE INDEX IF NOT EXISTS idx_projects_business_category ON projects(business_category);
 CREATE INDEX IF NOT EXISTS idx_keywords_keyword          ON keywords(keyword);
 CREATE INDEX IF NOT EXISTS idx_keywords_project_id       ON keywords(project_id);
 CREATE INDEX IF NOT EXISTS idx_search_logs_query         ON search_logs(query);
