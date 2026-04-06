@@ -161,11 +161,58 @@ class SearchEngine:
             pass
         return str(value).strip()
 
+    @staticmethod
+    def _normalize_budget_range(value: Any) -> str:
+        """
+        実数の予算金額を、画面の予算レンジ表現に変換する。
+        例:
+            240000   -> 100万円未満
+            2400000  -> 100万円以上、500万円未満
+        """
+        if value is None:
+            return ""
+
+        try:
+            if pd.isna(value):
+                return ""
+        except Exception:
+            pass
+
+        text = str(value).strip().replace(",", "")
+
+        # 数値として解釈できる場合は、金額帯へ変換
+        try:
+            amount = float(text)
+
+            if amount < 1_000_000:
+                return "100万円未満"
+            elif amount < 5_000_000:
+                return "100万円以上、500万円未満"
+            elif amount < 10_000_000:
+                return "500万円以上、1000万円未満"
+            else:
+                return "1000万円以上"
+        except ValueError:
+            # すでに「100万円未満」などの文字列ならそのまま返す
+            return text
+
+    def _budget_matches(self, query_budget: Any, project_budget: Any) -> bool:
+        """
+        画面で選んだ予算レンジと、案件の実予算が一致するかを判定する。
+        予算指定が空なら常に True。
+        """
+        q = self._normalize_text(query_budget)
+        if not q:
+            return True
+
+        p = self._normalize_budget_range(project_budget)
+        return q == p
+
     def _build_project_text(self, project: Dict[str, Any]) -> str:
         category = self._normalize_text(project.get("proposal_category"))
         target = self._normalize_text(project.get("target_group"))
         effect = self._normalize_text(project.get("expected_effect_type"))
-        budget = self._normalize_text(project.get("budget_range"))
+        budget = self._normalize_budget_range(project.get("budget_range"))
         phase = self._normalize_text(project.get("project_phase"))
 
         parts = [
@@ -225,7 +272,12 @@ class SearchEngine:
         score *= self._field_match_bonus(input_dict.get("proposal_category"), project.get("proposal_category"), exact=1.35, partial=1.15)
         score *= self._field_match_bonus(input_dict.get("target_group"), project.get("target_group"), exact=1.30, partial=1.12)
         score *= self._field_match_bonus(input_dict.get("expected_effect_type"), project.get("expected_effect_type"), exact=1.28, partial=1.10)
-        score *= self._field_match_bonus(input_dict.get("budget_range"), project.get("budget_range"), exact=1.15, partial=1.05)
+        score *= self._field_match_bonus(
+            input_dict.get("budget_range"),
+            self._normalize_budget_range(project.get("budget_range")),
+            exact=1.15,
+            partial=1.05,
+        )
         score *= self._field_match_bonus(input_dict.get("project_phase"), project.get("project_phase"), exact=1.12, partial=1.04)
 
         if not self._normalize_text(project.get("ringi_status")):
@@ -258,7 +310,16 @@ class SearchEngine:
         results = []
         for idx, base_score in enumerate(similarities):
             project = self.projects[idx].copy()
+
+            # 予算レンジが指定されている場合は、合う案件だけ残す
+            if not self._budget_matches(
+                input_dict.get("budget_range"),
+                project.get("budget_range")
+            ):
+                continue
+
             final_score = self._calculate_final_score(project, float(base_score), input_dict)
+
             project["similarity_score"] = round(final_score * 100, 1)
             project["base_score"] = round(float(base_score) * 100, 1)
             results.append(project)
