@@ -130,7 +130,13 @@ with st.form("search_form"):
         ]
         category = st.selectbox("📁 事業のカテゴリ", category_list)
         target = st.text_input("🎯 顧客ターゲット", placeholder="例: 経営層、全社従業員など")
-        budget_list = ["（指定なし）", "100万円未満", "100万〜500万円", "500万〜1,000万円", "1,000万円以上"]
+        budget_list = [
+            "（指定なし）",
+            "100万円未満",
+            "100万円以上、500万円未満",
+            "500万円以上、1000万円未満",
+            "1000万円以上"
+        ]
         budget = st.selectbox("💰 予算レンジ", budget_list)
 
     with col2:
