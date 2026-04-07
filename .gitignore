@@ -1,5 +1,7 @@
-data/
+data/*
+!data/projects.db
 __pycache__/
 *.pyc
 *.db
+!data/projects.db
 .env
