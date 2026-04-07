@@ -82,6 +82,7 @@ def insert_project(project: dict) -> int:
     base_vals = (
         project.get("project_name"),
         project.get("proposal_category"),
+        project.get("business_category"),
         project.get("target_group"),
         project.get("budget_range"),
         project.get("expected_effect_type"),
@@ -105,7 +106,7 @@ def insert_project(project: dict) -> int:
     if exists:
         cur.execute("""
             UPDATE projects SET
-                project_name=?, proposal_category=?, target_group=?,
+                project_name=?, proposal_category=?, business_category=?, target_group=?,
                 budget_range=?, expected_effect_type=?, project_phase=?,
                 proposal_period=?, proposal_year=?, proposal_department=?,
                 project_summary=?, ringi_status=?, ringi_reason=?,
@@ -117,7 +118,7 @@ def insert_project(project: dict) -> int:
     elif pid:
         cur.execute("""
             INSERT INTO projects
-                (project_id, project_name, proposal_category, target_group,
+                (project_id, project_name, proposal_category, business_category, business_category, target_group,
                  budget_range, expected_effect_type, project_phase, proposal_period,
                  proposal_year, proposal_department, project_summary,
                  ringi_status, ringi_reason, implemented_flag, final_result)
@@ -126,7 +127,7 @@ def insert_project(project: dict) -> int:
     else:
         cur.execute("""
             INSERT INTO projects
-                (project_name, proposal_category, target_group,
+                (project_name, proposal_category, business_category=?, target_group,
                  budget_range, expected_effect_type, project_phase, proposal_period,
                  proposal_year, proposal_department, project_summary,
                  ringi_status, ringi_reason, implemented_flag, final_result)
@@ -207,7 +208,7 @@ def update_project(project_id: int, project: dict) -> bool:
 
     cur.execute("""
         UPDATE projects SET
-            project_name=?,           proposal_category=?,    target_group=?,
+            project_name=?,           proposal_category=?,    business_category=?, target_group=?,
             budget_range=?,           expected_effect_type=?, project_phase=?,
             proposal_period=?,        proposal_year=?,         proposal_department=?,
             project_summary=?,        ringi_status=?,          ringi_reason=?,
@@ -216,6 +217,7 @@ def update_project(project_id: int, project: dict) -> bool:
     """, (
         project.get("project_name"),
         project.get("proposal_category"),
+        project.get("business_category"),
         project.get("target_group"),
         project.get("budget_range"),
         project.get("expected_effect_type"),
