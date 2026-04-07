@@ -23,7 +23,7 @@ except ImportError:
     get_kero_advice = None
 
 SEARCH_FIELDS = [
-    "proposal_category",
+    "business_category",
     "target_group",
     "budget_range",
     "expected_effect_type",
@@ -112,7 +112,7 @@ def _prepare_project_records(
     df = projects_df.copy()
 
     required_columns = [
-        "project_id", "project_name", "proposal_category", "target_group",
+        "project_id", "project_name", "proposal_category", "business_category", "target_group",
         "budget_range", "expected_effect_type", "project_phase", "proposal_period",
         "proposal_year", "proposal_department", "project_summary", "ringi_status",
         "ringi_reason", "implemented_flag", "final_result",
@@ -208,8 +208,20 @@ class SearchEngine:
         p = self._normalize_budget_range(project_budget)
         return q == p
 
+    def _exact_filter_matches(self, query_value: Any, project_value: Any) -> bool:
+        """
+        ドロップダウンで選んだ値と案件値が一致するかを判定する。
+        指定なし（空文字）なら常に True。
+        """
+        q = self._normalize_text(query_value)
+        if not q:
+            return True
+
+        p = self._normalize_text(project_value)
+        return q == p
+
     def _build_project_text(self, project: Dict[str, Any]) -> str:
-        category = self._normalize_text(project.get("proposal_category"))
+        category = self._normalize_text(project.get("business_category"))
         target = self._normalize_text(project.get("target_group"))
         effect = self._normalize_text(project.get("expected_effect_type"))
         budget = self._normalize_budget_range(project.get("budget_range"))
@@ -269,7 +281,7 @@ class SearchEngine:
 
     def _calculate_final_score(self, project: Dict[str, Any], base_score: float, input_dict: Dict[str, Any]) -> float:
         score = base_score
-        score *= self._field_match_bonus(input_dict.get("proposal_category"), project.get("proposal_category"), exact=1.35, partial=1.15)
+        score *= self._field_match_bonus(input_dict.get("business_category"), project.get("proposal_category"), exact=1.35, partial=1.15)
         score *= self._field_match_bonus(input_dict.get("target_group"), project.get("target_group"), exact=1.30, partial=1.12)
         score *= self._field_match_bonus(input_dict.get("expected_effect_type"), project.get("expected_effect_type"), exact=1.28, partial=1.10)
         score *= self._field_match_bonus(
@@ -311,10 +323,38 @@ class SearchEngine:
         for idx, base_score in enumerate(similarities):
             project = self.projects[idx].copy()
 
+            # 事業カテゴリが指定されている場合は一致案件だけ残す
+            if not self._exact_filter_matches(
+                input_dict.get("business_category"),
+                project.get("business_category")
+            ):
+                continue
+
+            # 対象顧客・対象部門が指定されている場合は一致案件だけ残す
+            if not self._exact_filter_matches(
+                input_dict.get("target_group"),
+                project.get("target_group")
+            ):
+                continue
+
             # 予算レンジが指定されている場合は、合う案件だけ残す
             if not self._budget_matches(
                 input_dict.get("budget_range"),
                 project.get("budget_range")
+            ):
+                continue
+
+            # 想定効果の種類が指定されている場合は一致案件だけ残す
+            if not self._exact_filter_matches(
+                input_dict.get("expected_effect_type"),
+                project.get("expected_effect_type")
+            ):
+                continue
+
+            # 事業フェーズが指定されている場合は一致案件だけ残す
+            if not self._exact_filter_matches(
+                input_dict.get("project_phase"),
+                project.get("project_phase")
             ):
                 continue
 
@@ -355,7 +395,7 @@ def search_projects(input_dict: Dict[str, Any], top_n: int = 20) -> pd.DataFrame
     preferred_order = [
         "project_id", "project_name", "similarity_score", "base_score",
         "proposal_period", "proposal_year", "proposal_department",
-        "proposal_category", "target_group", "budget_range",
+        "proposal_category", "business_category", "target_group", "budget_range",
         "expected_effect_type", "project_phase", "ringi_status",
         "ringi_reason", "implemented_flag", "final_result",
         "related_departments", "related_members",

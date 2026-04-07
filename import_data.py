@@ -46,6 +46,7 @@ for file_path in glob.glob("data/project_*.html"):
         "project_id": pid,
         "project_name": get_td("project-name"),
         "proposal_category": get_td("proposal-category"),
+        "business_category": get_td("business-category"),
         "target_group": get_td("target-group"),
         "budget_range": get_td("budget-range"),
         "expected_effect_type": get_td("expected-effect-type"),
