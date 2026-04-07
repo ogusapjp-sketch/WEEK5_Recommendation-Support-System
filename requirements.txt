@@ -1,0 +1,8 @@
+streamlit
+pandas
+scikit-learn
+pillow
+openai
+python-dotenv
+beautifulsoup4
+requests
