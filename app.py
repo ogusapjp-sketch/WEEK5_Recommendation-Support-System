@@ -79,7 +79,7 @@ if char_image:
     # 【有効活用：アーカイブ統計】
     st.sidebar.subheader("📊 アーカイブ状況")
     s_col1, s_col2 = st.sidebar.columns(2)
-    s_col1.metric("総案件数", "91件")
+    s_col1.metric("総案件数", "200件")
     s_col2.metric("今月の新着", "5件")
     
     st.sidebar.divider()
@@ -124,12 +124,32 @@ with st.form("search_form"):
     col1, col2 = st.columns(2)
     
     with col1:
-        category_list = [
-            "（指定なし）", "テクノロジー / デジタル事業", "ライフ / ヘルスケア事業", 
-            "産業向け（B2B）ソリューション事業", "消費者向けサービス / コンテンツ事業", "社会課題・サステナビリティ事業"
+
+        business_category_list = [
+            "（指定なし）",
+            "テクノロジー/デジタル事業",
+            "ライフ/ヘルスケア事業",
+            "産業向け（B2B)ソリューション事業",
+            "消費者向けサービス/コンテンツ事業",
+            "社会課題・サステナビリティ事業"
         ]
-        category = st.selectbox("📁 事業のカテゴリ", category_list)
-        target = st.text_input("🎯 顧客ターゲット", placeholder="例: 経営層、全社従業員など")
+        business_category = st.selectbox("📁 事業カテゴリ", business_category_list)
+
+        target_group_list = [
+            "（指定なし）",
+            "事業企画部",
+            "生産技術部",
+            "経営管理部",
+            "製造業顧客",
+            "自動車部品メーカー",
+            "食品メーカー",
+            "医療機関",
+            "物流事業者",
+            "販売代理店",
+            "一般消費者"
+        ]
+        target_group = st.selectbox("🎯 対象顧客・対象部門", target_group_list)
+        
         budget_list = [
             "（指定なし）",
             "100万円未満",
@@ -140,10 +160,32 @@ with st.form("search_form"):
         budget = st.selectbox("💰 予算レンジ", budget_list)
 
     with col2:
-        effect_list = ["（指定なし）", "業務効率化", "売上向上", "コスト削減"]
-        effect = st.selectbox("📈 事業の方向性", effect_list)
-        phase_list = ["（指定なし）", "アイデア・企画段階", "PoC・検証中", "本稼働", "運用・改善"]
-        phase = st.selectbox("🏁 プロジェクトフェーズ", phase_list)
+        effect_list = [
+            "（指定なし）",
+            "売上拡大",
+            "新規顧客獲得",
+            "継続利用率向上",
+            "顧客体験向上",
+            "顧客提案力向上",
+            "業務効率化",
+            "生産能力向上",
+            "品質向上",
+            "原価低減",
+            "環境負荷低減"
+        ]
+        effect = st.selectbox("📈 想定効果の種類", effect_list)
+        
+        phase_list = [
+            "（指定なし）",
+            "構想",
+            "PoC",
+            "試験導入",
+            "導入準備",
+            "本格導入",
+            "横展開"
+        ]
+        phase = st.selectbox("🏁 事業フェーズ", phase_list)
+
         st.write("") 
         submit_btn = st.form_submit_button("💡 ケロさんにアーカイブを探してもらう", use_container_width=True)
 
@@ -157,11 +199,12 @@ if "last_input_dict" not in st.session_state:
 if "project_summaries" not in st.session_state:
     st.session_state["project_summaries"] = {}
 
+
 # ── 検索実行 ───────────────────────────────────────────────────
 if submit_btn:
     input_dict = {
-        "proposal_category": category if category != "（指定なし）" else "",
-        "target_group": target,
+        "business_category": business_category if business_category != "（指定なし）" else "",
+        "target_group": target_group if target_group != "（指定なし）" else "",
         "budget_range": budget if budget != "（指定なし）" else "",
         "expected_effect_type": effect if effect != "（指定なし）" else "",
         "project_phase": phase if phase != "（指定なし）" else ""
